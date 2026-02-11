@@ -330,6 +330,9 @@
     .provider-anthropic { background: var(--color-coral-bg); color: var(--color-coral); }
     .provider-openai { background: var(--color-teal-bg); color: var(--color-teal); }
     .provider-google { background: var(--color-sandy-bg); color: var(--color-sandy); }
+    .provider-xai { background: rgba(100,100,220,0.12); color: #6464dc; }
+    .provider-moonshot { background: rgba(80,170,120,0.12); color: #3a9960; }
+    .provider-deepseek { background: rgba(70,140,200,0.12); color: #468cc8; }
 
     /* --- Selected tags (below trigger) --- */
     .selected-tags {
@@ -358,6 +361,9 @@
     .selected-tag[data-provider="Anthropic"] { background: var(--color-coral-bg); color: var(--color-coral); border-color: var(--color-coral); }
     .selected-tag[data-provider="OpenAI"] { background: var(--color-teal-bg); color: var(--color-teal); border-color: var(--color-teal); }
     .selected-tag[data-provider="Google"] { background: var(--color-sandy-bg); color: var(--color-sandy); border-color: var(--color-sandy); }
+    .selected-tag[data-provider="xAI"] { background: rgba(100,100,220,0.12); color: #6464dc; border-color: #6464dc; }
+    .selected-tag[data-provider="Moonshot"] { background: rgba(80,170,120,0.12); color: #3a9960; border-color: #3a9960; }
+    .selected-tag[data-provider="DeepSeek"] { background: rgba(70,140,200,0.12); color: #468cc8; border-color: #468cc8; }
 
     /* ============================================
        PROMPT INPUT SECTION
@@ -488,6 +494,9 @@
     .response-card[data-provider="Anthropic"] { border-top: 3px solid var(--color-coral); }
     .response-card[data-provider="OpenAI"] { border-top: 3px solid var(--color-teal); }
     .response-card[data-provider="Google"] { border-top: 3px solid var(--color-sandy); }
+    .response-card[data-provider="xAI"] { border-top: 3px solid #6464dc; }
+    .response-card[data-provider="Moonshot"] { border-top: 3px solid #3a9960; }
+    .response-card[data-provider="DeepSeek"] { border-top: 3px solid #468cc8; }
 
     .card-header {
       display: flex; align-items: center; gap: 8px;
@@ -851,6 +860,9 @@
     .result-bar.bar-anthropic { background: var(--color-coral); }
     .result-bar.bar-openai { background: var(--color-teal); }
     .result-bar.bar-google { background: var(--color-sandy); }
+    .result-bar.bar-xai { background: #6464dc; }
+    .result-bar.bar-moonshot { background: #3a9960; }
+    .result-bar.bar-deepseek { background: #468cc8; }
     .result-bar.bar-default { background: var(--color-text-muted); }
     .result-votes {
       font-family: var(--font-mono);
@@ -999,6 +1011,6 @@
     </aside>
   </div>
 
-  <script src="/static/app.js?v=20260211a"></script>
+  <script src="/static/app.js?v=20260211b"></script>
 </body>
 </html>

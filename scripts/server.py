@@ -26,9 +26,12 @@ AVAILABLE_MODELS = [
     {"id": "anthropic/claude-sonnet-4.5", "name": "Claude Sonnet 4.5", "provider": "Anthropic"},
     {"id": "anthropic/claude-opus-4.5", "name": "Claude Opus 4.5", "provider": "Anthropic"},
     {"id": "openai/gpt-4o", "name": "GPT-4o", "provider": "OpenAI"},
+    {"id": "openai/gpt-5.1", "name": "GPT-5.1", "provider": "OpenAI"},
     {"id": "google/gemini-2.5-flash", "name": "Gemini 2.5 Flash", "provider": "Google"},
     {"id": "google/gemini-2.5-pro", "name": "Gemini 2.5 Pro", "provider": "Google"},
-    {"id": "openai/gpt-5.1", "name": "GPT-5.1", "provider": "OpenAI"},
+    {"id": "x-ai/grok-4", "name": "Grok 4", "provider": "xAI"},
+    {"id": "moonshotai/kimi-k2.5", "name": "Kimi K2.5", "provider": "Moonshot"},
+    {"id": "deepseek/deepseek-r1", "name": "DeepSeek R1", "provider": "DeepSeek"},
 ]
 
 MIME_TYPES = {
