@@ -873,6 +873,96 @@
     }
 
     /* ============================================
+       CHAIRMAN PANEL
+       ============================================ */
+    #chairman-panel {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 0;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.4s ease, opacity 0.4s ease, padding 0.4s ease;
+    }
+    #chairman-panel.visible {
+      max-height: 5000px;
+      opacity: 1;
+      padding: 20px;
+    }
+    .chairman-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .chairman-title {
+      font-family: var(--font-heading);
+      font-size: 1.3rem;
+      background: linear-gradient(135deg, var(--color-coral), var(--color-warning));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .chairman-actions {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .chairman-selector-wrapper {
+      display: flex; align-items: center;
+    }
+    .chairman-model-select {
+      padding: 6px 12px;
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-bg-primary);
+      color: var(--color-text-primary);
+      font-family: var(--font-body);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      min-width: 180px;
+    }
+    .chairman-model-select:focus {
+      outline: none;
+      border-color: var(--color-coral);
+    }
+    .chairman-model-select:disabled {
+      opacity: 0.5; cursor: not-allowed;
+    }
+    #start-chairman-btn {
+      padding: 8px 20px;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: linear-gradient(135deg, var(--color-coral), var(--color-warning));
+      color: #fff;
+    }
+    #start-chairman-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    #start-chairman-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .chairman-description {
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      margin-bottom: 16px;
+    }
+    #chairman-content {
+      font-size: 0.9rem;
+      line-height: 1.65;
+      max-height: 600px;
+      overflow-y: auto;
+      padding: 16px;
+      background: var(--color-bg-primary);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border);
+    }
+    #chairman-content:empty { display: none; }
+    #chairman-content .code-block { background: #1e1e2e; color: #cdd6f4; }
+
+    /* ============================================
        ANIMATIONS
        ============================================ */
     @keyframes fadeInUp {
@@ -991,6 +1081,26 @@
         <div id="voting-results" style="display:none;"></div>
       </section>
 
+      <!-- CHAIRMAN PANEL -->
+      <section id="chairman-panel">
+        <div class="chairman-header">
+          <span class="chairman-title">Chairman's Final Answer</span>
+          <div class="chairman-actions">
+            <div class="chairman-selector-wrapper">
+              <label for="chairman-model-select" style="font-size:0.82rem;color:var(--color-text-secondary);margin-right:8px;">Chairman:</label>
+              <select id="chairman-model-select" class="chairman-model-select">
+                <option value="">Select chairman...</option>
+              </select>
+            </div>
+            <button id="start-chairman-btn">Request Chairman Review</button>
+          </div>
+        </div>
+        <p class="chairman-description" id="chairman-description">
+          The chairman model reads ALL responses AND the voting results, then writes a definitive final answer.
+        </p>
+        <div id="chairman-content"></div>
+      </section>
+
       <!-- SYNTHESIS PANEL -->
       <section id="synthesis-panel">
         <div class="synthesis-header">
@@ -1011,6 +1121,6 @@
     </aside>
   </div>
 
-  <script src="/static/app.js?v=20260211b"></script>
+  <script src="/static/app.js?v=20260211c"></script>
 </body>
 </html>

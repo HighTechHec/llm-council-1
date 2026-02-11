@@ -20,6 +20,7 @@
     COUNCIL_STREAM: '/api/council/stream',
     SYNTHESIZE: '/api/council/synthesize',
     VOTE: '/api/council/vote',
+    CHAIRMAN: '/api/council/chairman',
   };
 
   const STORAGE_KEYS = {
@@ -41,6 +42,8 @@
     isConvening: false,
     currentPrompt: '',
     dropdownOpen: false,
+    chairmanModel: '',
+    voteResults: null,
   };
 
   // ---------------------------------------------------------------------------
@@ -75,6 +78,11 @@
     dom.selectAllBtn = document.getElementById('select-all-btn');
     dom.deselectAllBtn = document.getElementById('deselect-all-btn');
     dom.selectedTags = document.getElementById('selected-tags');
+    dom.chairmanPanel = document.getElementById('chairman-panel');
+    dom.chairmanModelSelect = document.getElementById('chairman-model-select');
+    dom.startChairmanBtn = document.getElementById('start-chairman-btn');
+    dom.chairmanContent = document.getElementById('chairman-content');
+    dom.chairmanDescription = document.getElementById('chairman-description');
   }
 
   // ---------------------------------------------------------------------------
@@ -304,6 +312,9 @@
     if (dom.synthesisContent) dom.synthesisContent.innerHTML = '';
     if (dom.synthesisPanel) dom.synthesisPanel.classList.remove('visible');
     if (dom.votingPanel) dom.votingPanel.classList.remove('visible');
+    if (dom.chairmanPanel) dom.chairmanPanel.classList.remove('visible');
+    state.voteResults = null;
+    state.chairmanModel = '';
 
     var selectedIds = Array.from(state.selectedModels);
     var modelLookup = {};
@@ -679,6 +690,8 @@
   }
 
   function displayVoteResults(data, completed, modelLookup) {
+    // Save vote results for chairman
+    state.voteResults = data;
     // data = { votes: { modelId: { score: N, voters: [...] } }, winner: modelId, details: [...] }
     if (dom.votingCardsContainer) dom.votingCardsContainer.innerHTML = '';
     if (dom.votingDescription) {
@@ -755,6 +768,153 @@
     }
 
     setStatus('Vote complete');
+
+    // Show chairman panel after voting completes
+    if (dom.chairmanPanel) {
+      dom.chairmanPanel.classList.add('visible');
+      populateChairmanSelector();
+      if (dom.startChairmanBtn) {
+        dom.startChairmanBtn.disabled = false;
+        dom.startChairmanBtn.textContent = 'Request Chairman Review';
+      }
+      if (dom.chairmanContent) dom.chairmanContent.innerHTML = '';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Chairman
+  // ---------------------------------------------------------------------------
+
+  function populateChairmanSelector() {
+    if (!dom.chairmanModelSelect) return;
+    dom.chairmanModelSelect.innerHTML = '<option value="">Select chairman...</option>';
+    state.selectedModels.forEach(function (modelId) {
+      var model = state.models.find(function (m) { return m.id === modelId; });
+      if (!model) return;
+      var opt = document.createElement('option');
+      opt.value = modelId;
+      opt.textContent = model.name;
+      dom.chairmanModelSelect.appendChild(opt);
+    });
+  }
+
+  async function runChairmanReview() {
+    if (!state.chairmanModel) {
+      if (dom.chairmanDescription) {
+        dom.chairmanDescription.textContent = 'Please select a chairman model first.';
+        dom.chairmanDescription.style.color = 'var(--color-error)';
+      }
+      return;
+    }
+    if (!state.voteResults) {
+      setStatus('Must run voting first');
+      return;
+    }
+
+    var completed = [];
+    state.responses.forEach(function (data, modelId) {
+      if (data.status === 'complete' && data.content) {
+        completed.push({ model: modelId, content: data.content, status: 'complete' });
+      }
+    });
+    if (completed.length < 2) {
+      setStatus('Need 2+ completed responses');
+      return;
+    }
+
+    if (dom.chairmanDescription) {
+      dom.chairmanDescription.style.color = 'var(--color-text-muted)';
+      dom.chairmanDescription.textContent = 'Chairman is reviewing all responses and voting results...';
+    }
+    if (dom.startChairmanBtn) dom.startChairmanBtn.disabled = true;
+    if (dom.chairmanModelSelect) dom.chairmanModelSelect.disabled = true;
+    if (dom.chairmanContent) {
+      dom.chairmanContent.style.display = 'block';
+      dom.chairmanContent.innerHTML = '<div class="typing-indicator">Chairman is deliberating...</div>';
+    }
+    setStatus('Chairman reviewing...');
+
+    try {
+      var res = await fetch(API.CHAIRMAN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: state.currentPrompt,
+          responses: completed,
+          vote_results: state.voteResults,
+          chairman_model: state.chairmanModel,
+        }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      // Read SSE stream with keepalive pings
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder('utf-8');
+      var buf = '';
+      var chairmanResult = null;
+
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buf += decoder.decode(chunk.value, { stream: true });
+
+        var endsNl = buf.endsWith('\n');
+        var segs = buf.split('\n');
+        buf = endsNl ? '' : segs.pop();
+
+        for (var si = 0; si < segs.length; si++) {
+          var ln = segs[si].trim();
+          if (!ln || ln.startsWith(':')) continue;
+          if (ln.startsWith('data:')) {
+            try {
+              var parsed = JSON.parse(ln.slice(5).trim());
+              if (parsed.status === 'done' && parsed.result) {
+                chairmanResult = parsed.result;
+              } else if (parsed.status === 'error') {
+                throw new Error(parsed.error || 'Chairman review failed');
+              }
+            } catch (pe) {
+              if (pe.message && pe.message.indexOf('Chairman') === -1) {
+                /* JSON parse error, skip */
+              } else { throw pe; }
+            }
+          }
+        }
+        if (chairmanResult) {
+          try { reader.cancel(); } catch (_) {}
+          break;
+        }
+      }
+
+      if (chairmanResult) {
+        if (dom.chairmanContent) {
+          dom.chairmanContent.innerHTML = renderMarkdown(chairmanResult);
+        }
+        var modelInfo = state.models.find(function (m) { return m.id === state.chairmanModel; });
+        if (dom.chairmanDescription) {
+          dom.chairmanDescription.textContent =
+            'Final answer from ' + (modelInfo ? modelInfo.name : state.chairmanModel) + ' as chairman.';
+        }
+        setStatus('Chairman review complete');
+      } else {
+        throw new Error('No chairman result received');
+      }
+    } catch (err) {
+      if (dom.chairmanContent) {
+        dom.chairmanContent.innerHTML = '<p class="error-message">Chairman review failed: ' + escapeHtml(err.message) + '</p>';
+      }
+      if (dom.chairmanDescription) {
+        dom.chairmanDescription.textContent = 'Chairman review failed: ' + err.message;
+        dom.chairmanDescription.style.color = 'var(--color-error)';
+      }
+      setStatus('Chairman error');
+    }
+
+    if (dom.startChairmanBtn) {
+      dom.startChairmanBtn.disabled = false;
+      dom.startChairmanBtn.textContent = 'Request Again';
+    }
+    if (dom.chairmanModelSelect) dom.chairmanModelSelect.disabled = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -834,6 +994,10 @@
     if (dom.conveneBtn) dom.conveneBtn.addEventListener('click', conveneCouncil);
     if (dom.synthesizeBtn) dom.synthesizeBtn.addEventListener('click', synthesizeResponses);
     if (dom.startVoteBtn) dom.startVoteBtn.addEventListener('click', runAnonymousModelVote);
+    if (dom.startChairmanBtn) dom.startChairmanBtn.addEventListener('click', runChairmanReview);
+    if (dom.chairmanModelSelect) dom.chairmanModelSelect.addEventListener('change', function () {
+      state.chairmanModel = dom.chairmanModelSelect.value;
+    });
 
     // Dropdown trigger: simple click toggle
     if (dom.selectorTrigger) {

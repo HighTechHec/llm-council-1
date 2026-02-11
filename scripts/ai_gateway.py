@@ -373,3 +373,87 @@ def synthesize_responses(prompt: str, responses: list, api_key: str) -> str:
         return f"[Synthesis error] {result['content']}"
 
     return result["content"]
+
+
+def chairman_review(prompt: str, responses: list, vote_results: dict,
+                    chairman_model: str, api_key: str) -> str:
+    """Chairman model reviews all responses and voting results, writes a final answer.
+
+    Args:
+        prompt:          The original user prompt.
+        responses:       List of dicts [{"model": id, "content": text}, ...].
+        vote_results:    Dict from anonymous_model_vote: {"votes": {...}, "winner": id, "details": [...]}.
+        chairman_model:  Model ID to act as chairman.
+        api_key:         AI Gateway API key.
+
+    Returns:
+        The chairman's final definitive answer as a plain string.
+    """
+    # Build context with all model responses
+    model_sections = []
+    for r in responses:
+        label = r.get("model", "unknown")
+        content = r.get("content", "(no content)")
+        model_sections.append(f"[{label}]:\n{content}")
+
+    # Build voting summary
+    votes = vote_results.get("votes", {})
+    winner = vote_results.get("winner", "")
+    details = vote_results.get("details", [])
+
+    vote_summary = f"WINNER: {winner}\n\nSCORES:\n"
+    for model_id, vote_data in sorted(votes.items(), key=lambda x: x[1]["score"], reverse=True):
+        score = vote_data.get("score", 0)
+        voters = vote_data.get("voters", [])
+        vote_summary += f"- {model_id}: {score} points\n"
+        for voter in voters:
+            vote_summary += f"  * {voter.get('voter', '?')}: +{voter.get('points', 0)} ({voter.get('reason', '')})\n"
+
+    critique_summary = "\nDETAILED CRITIQUES:\n"
+    for judge in details:
+        voter_id = judge.get("voter", "unknown")
+        rankings = judge.get("rankings", [])
+        if rankings:
+            critique_summary += f"\n{voter_id}'s evaluations:\n"
+            for rank in rankings:
+                critique_summary += (
+                    f"  - {rank.get('target', '?')}: {rank.get('score', 0)}/10"
+                    f" - {rank.get('reason', '')}\n"
+                )
+
+    system = (
+        "You are the CHAIRMAN of an LLM Council. You have reviewed all model responses "
+        "to the original prompt, AND you have access to the anonymous voting results where "
+        "each model scored the others.\n\n"
+        "Your role is NOT to summarize or find consensus. Instead, you must:\n"
+        "1. Read ALL responses carefully\n"
+        "2. Consider the voting scores and critiques from peer models\n"
+        "3. Write a NEW, DEFINITIVE answer that incorporates the best elements\n"
+        "4. Make executive decisions where models disagree\n"
+        "5. Provide your reasoning for key choices\n\n"
+        "Be authoritative. This is YOUR final answer as chairman, not a synthesis."
+    )
+
+    user_content = (
+        f"ORIGINAL PROMPT:\n{prompt}\n\n"
+        f"MODEL RESPONSES:\n{'=' * 60}\n" + "\n\n".join(model_sections) + "\n\n"
+        f"VOTING RESULTS:\n{'=' * 60}\n{vote_summary}\n{critique_summary}\n\n"
+        f"As chairman, provide your final definitive answer to the original prompt, "
+        f"informed by all responses and voting results."
+    )
+
+    _log(f"chairman review by {chairman_model}")
+    result = query_model(
+        prompt=user_content,
+        model_id=chairman_model,
+        api_key=api_key,
+        system_prompt=system,
+        stream=False,
+    )
+
+    if result["status"] == "error":
+        _log(f"chairman review failed: {result['content']}")
+        return f"[Chairman review error] {result['content']}"
+
+    _log(f"chairman review complete by {chairman_model} in {result['duration']}s")
+    return result["content"]

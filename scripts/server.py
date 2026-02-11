@@ -18,7 +18,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from urllib.parse import urlparse
 
-from ai_gateway import query_models_parallel, query_models_stream, synthesize_responses, anonymous_model_vote
+from ai_gateway import query_models_parallel, query_models_stream, synthesize_responses, anonymous_model_vote, chairman_review
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -126,6 +126,8 @@ class CouncilRequestHandler(SimpleHTTPRequestHandler):
             self._handle_synthesize()
         elif path == "/api/council/vote":
             self._handle_vote()
+        elif path == "/api/council/chairman":
+            self._handle_chairman()
         else:
             self._send_error_json(HTTPStatus.NOT_FOUND, "Not found")
 
@@ -275,6 +277,57 @@ class CouncilRequestHandler(SimpleHTTPRequestHandler):
             pass
         finally:
             vote_thread.join(timeout=5)
+
+    def _handle_chairman(self):
+        """Run chairman review via SSE stream to avoid proxy timeouts."""
+        body = self._read_json_body()
+        if not body or "prompt" not in body or "responses" not in body or "vote_results" not in body or "chairman_model" not in body:
+            self._send_error_json(HTTPStatus.BAD_REQUEST, "Missing required fields")
+            return
+
+        prompt = body["prompt"]
+        responses = body["responses"]
+        vote_results = body["vote_results"]
+        chairman_model = body["chairman_model"]
+
+        # Set up SSE response
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self._set_cors_headers()
+        self.end_headers()
+
+        result_holder = {"result": None, "error": None}
+
+        def _do_chairman():
+            try:
+                result_holder["result"] = chairman_review(
+                    prompt, responses, vote_results, chairman_model, self.api_key
+                )
+            except Exception as exc:
+                result_holder["error"] = str(exc)
+
+        chairman_thread = threading.Thread(target=_do_chairman, daemon=True)
+        chairman_thread.start()
+
+        try:
+            while chairman_thread.is_alive():
+                self.wfile.write(b": keepalive\n\n")
+                self.wfile.flush()
+                chairman_thread.join(timeout=5)
+
+            if result_holder["error"]:
+                event = {"status": "error", "error": result_holder["error"]}
+            else:
+                event = {"status": "done", "result": result_holder["result"]}
+            self.wfile.write(f"data: {json.dumps(event)}\n\n".encode())
+            self.wfile.flush()
+            time.sleep(0.2)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            chairman_thread.join(timeout=5)
 
     # -- Suppress default logging noise ------------------------------------
 
